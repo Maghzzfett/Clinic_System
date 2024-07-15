@@ -23,23 +23,30 @@ class Admin (Persons):
      def __str__(self):
           return self.name
      
-class healthCareProffesions(models.Model):
-     code= models.CharField(max_length=200, primary_key= True)
+class DoctorType(models.Model):
+     code_choice= models.TextChoices(
+          "code_choice",
+          "RAD MICRO BIOCHEM GASTRO")
+     code= models.CharField(max_length=200, choices= code_choice, primary_key= True)
      proffession_choices= models.TextChoices(
           "proffession_choices",
-            "Radiologist clinicalMicrobiolodists clinicalBiochemist")
+            "Radiologist ClinicalMicrobiologist ClinicalBiochemist ClinicalGastroenterology")
+     departmentChoises= models.TextChoices(
+          "departmentChoises",
+          "Radiology Gastroenterology ClinicalLaboratoryDepartment")
      proffession= models.CharField(max_length=200, choices= proffession_choices)
-     department= models.CharField(max_length=200)
-     is_active= models.BooleanField(default= True)
+     department= models.CharField(max_length=200, choices= departmentChoises)
+     
 
      def __str__(self):
           return self.profession
 
 class Doctor (Persons):
      specialization = models.CharField(max_length=200, choices= SPECIALIZATION_CHOICE)
+     is_active= models.BooleanField(default= True)
      admin = models.ForeignKey(Admin, on_delete= models.CASCADE)
      patient= models.ManyToManyField ("Patient", through= 'Appointment')
-     doc_type= models.ForeignKey(healthCareProffesions, on_delete=models.CASCADE)
+     doc_type= models.OneToOneField(DoctorType, on_delete=models.CASCADE)
 
      def __str__(self):
           return self.name
@@ -67,6 +74,7 @@ class Schedule(models.Model):
       date_scheduled= models.DateTimeField()
       is_available= models.BooleanField(default= True)
       doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+      admin = models.ForeignKey(Admin, on_delete= models.CASCADE)
 
       def __str__(self):
            return f"{self.date_scheduled}-{self.doctor}-{self.is_available}"
@@ -77,8 +85,7 @@ class MedicalRecord(models.Model):
      testResult= models.TextField(max_length=200)
      dateUpdate= models.DateField()
      patient= models.ForeignKey(Patient, on_delete=models.CASCADE)
-     doctors= models.ManyToManyField(Doctor)
-
+     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
      def __str__(self):
           return "%s 's Medical Record %s" % (self.patient)
      
@@ -88,7 +95,16 @@ class Test(models.Model):
      testResult= models.TextField(max_length=200)
      patient= models.ForeignKey(Patient, on_delete=models.CASCADE)
      medicalRecord= models.ForeignKey(MedicalRecord, on_delete=models.CASCADE)
-     doctors= models.ManyToManyField(Doctor)
+     
 
      def __str__ (self):
           return self.name
+
+class Prescription(models.Model):
+     drugType= models.CharField(max_length=200)
+     drugName= models.CharField(max_length=200)
+     doctor= models.ForeignKey(Doctor, on_delete=models.CASCADE)
+     patient= models.ForeignKey(Patient, on_delete=models.CASCADE)
+
+     def __str__ (self):
+          return f"{self.drugType}-{self.drugName}"
