@@ -24,7 +24,6 @@ class Admin (Persons):
           return self.name
      
 class DoctorType(models.Model):
-     id= models.AutoField(primary_key=True, default=1)
      code_choice= models.TextChoices(
           "code_choice",
           "RAD MICRO BIOCHEM GASTRO")
