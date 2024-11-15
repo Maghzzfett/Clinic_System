@@ -1,110 +1,79 @@
-from typing import Any
 from django.db import models
+from django.utils import timezone
+from django.contrib.auth.models import AbstractUser,Group,Permission
 
-SPECIALIZATION_CHOICE = (
-    ("Admin","Administrator"),
-    ("Doctor","Docteor")
-)
+
+USER_ROLES= [
+     ('Admin','Admin'),
+     ('Doctor', 'Doctor'), 
+
+     ('Patient', 'Patient'),
+]
+
+GENDER= [
+     ('MALE','male'),
+     ('FEMALE','female'),
+]
 
 # Create your models here.
-class Persons(models.Model):
-    genderChoice= models.TextChoices("genderChoice", "male female")
-    name = models.CharField(max_length=20)
-    gender = models.CharField(max_length=20, choices=genderChoice)
-    phone = models.IntegerField()
-    email = models.EmailField(max_length=30)
-   
-    class Meta:
-        abstract = True
+class CustomUser(AbstractUser):
+    role = models.CharField(max_length=30, choices=USER_ROLES)
+    gender = models.CharField(max_length=10, choices=GENDER)
+    phone = models.CharField(max_length=30)
+    code = models.CharField(max_length=20)
+    date_recorded = models.DateTimeField(default=timezone.now)
+    date_of_birth = models.DateField()
+    groups = models.ManyToManyField(Group, related_name='customuser_groups')
+    user_permissions = models.ManyToManyField(Permission, related_name='customuser_permissions')
 
-class Admin (Persons):
-     specialization = models.CharField(max_length=50, choices= SPECIALIZATION_CHOICE)
-     
-     def __str__(self):
-          return self.name
-     
-class DoctorType(models.Model):
-     code_choice= models.TextChoices(
-          "code_choice",
-          "RAD MICRO BIOCHEM GASTRO")
-     code= models.CharField(max_length=50, choices= code_choice)
-     proffession_choices= models.TextChoices(
-          "proffession_choices",
-            "Radiologist ClinicalMicrobiologist ClinicalBiochemist ClinicalGastroenterology")
-     departmentChoises= models.TextChoices(
-          "departmentChoises",
-          "Radiology Gastroenterology ClinicalLaboratoryDepartment")
-     proffession= models.CharField(max_length=50, choices= proffession_choices)
-     department= models.CharField(max_length=50, choices= departmentChoises)
-     
+    def __str__(self):
+        return f"{self.username} - {self.role}"
+    
 
-     def __str__(self):
-          return self.profession
-
-class Doctor (Persons):
-     specialization = models.CharField(max_length=50, choices= SPECIALIZATION_CHOICE)
-     is_active= models.BooleanField(default= True)
-     admin = models.ForeignKey(Admin, on_delete= models.CASCADE)
-     patient= models.ManyToManyField ("Patient", through= 'Appointment')
-     doc_type= models.ForeignKey(DoctorType, on_delete=models.CASCADE)
-
-     def __str__(self):
-          return self.name
-
-class Patient (Persons):
-     date_recorded= models.DateTimeField()
-     dateOf_birth=models.DateField()
-     admin = models.ForeignKey(Admin, on_delete= models.CASCADE)
-
-     def __str__ (self):
-          return self.name
-     
 class Appointment(models.Model):
-      description = models.TextField()
-      date_requested = models.DateField()
-      approval_status = models.BooleanField(default=False)
-      admin = models.ForeignKey(Admin, on_delete= models.CASCADE)
-      doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
-      patient = models.ForeignKey(Patient, on_delete=models.CASCADE)
-      
-      def __str__(self):
-           return f" {self.doctor} - {self.patient}"
-      
+    description = models.TextField()
+    date_requested = models.DateField()
+    approval_status = models.BooleanField(default=False)
+    doctor = models.ForeignKey(CustomUser, limit_choices_to={'role': 'DOCTOR'}, related_name='doctor_appointments', on_delete=models.CASCADE)
+    patient = models.ForeignKey(CustomUser, limit_choices_to={'role': 'PATIENT'}, related_name='patient_appointments', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.doctor.username} - {self.patient.username}"
+
 class Schedule(models.Model):
-      date_scheduled= models.DateTimeField()
-      is_available= models.BooleanField(default= True)
-      doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
-      admin = models.ForeignKey(Admin, on_delete= models.CASCADE)
+    date_scheduled = models.DateTimeField()
+    is_available = models.BooleanField(default=True)
+    doctor = models.ForeignKey(CustomUser, limit_choices_to={'role': 'DOCTOR'}, related_name='doctor_schedules', on_delete=models.CASCADE)
 
-      def __str__(self):
-           return f"{self.date_scheduled}-{self.doctor}-{self.is_available}"
-      
+    def __str__(self):
+        return f"{self.date_scheduled} - {self.doctor.username} - {self.is_available}"
+
 class MedicalRecord(models.Model):
-     diagnosis= models.TextField()
-     medicalHistory= models.TextField()
-     testResult= models.TextField()
-     dateUpdate= models.DateField()
-     patient= models.ForeignKey(Patient, on_delete=models.CASCADE)
-     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
-     def __str__(self):
-          return "%s 's Medical Record %s" % (self.patient)
-     
-class Test(models.Model):
-     name= models.CharField(max_length=50)
-     dateRecorded= models.DateField()
-     testResult= models.TextField()
-     patient= models.ForeignKey(Patient, on_delete=models.CASCADE)
-     medicalRecord= models.ForeignKey(MedicalRecord, on_delete=models.CASCADE)
-     
+    diagnosis = models.TextField()
+    medical_history = models.TextField()
+    test_result = models.TextField()
+    date_update = models.DateField()
+    patient = models.ForeignKey(CustomUser, limit_choices_to={'role': 'PATIENT'}, related_name='patient_medical_records', on_delete=models.CASCADE)
+    doctor = models.ForeignKey(CustomUser, limit_choices_to={'role': 'DOCTOR'}, related_name='doctor_medical_records', on_delete=models.CASCADE)
 
-     def __str__ (self):
-          return self.name
+    def __str__(self):
+        return f"{self.patient.username}'s Medical Record"
+
+class Test(models.Model):
+    name = models.CharField(max_length=50)
+    date_recorded = models.DateField()
+    test_result = models.TextField()
+    patient = models.ForeignKey(CustomUser, limit_choices_to={'role': 'PATIENT'}, related_name='patient_tests', on_delete=models.CASCADE)
+    medical_record = models.ForeignKey(MedicalRecord, related_name='medical_record_tests', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
 
 class Prescription(models.Model):
-     drugType= models.CharField(max_length=50)
-     drugName= models.CharField(max_length=50)
-     doctor= models.ForeignKey(Doctor, on_delete=models.CASCADE)
-     patient= models.ForeignKey(Patient, on_delete=models.CASCADE)
+    drug_type = models.CharField(max_length=50)
+    drug_name = models.CharField(max_length=50)
+    doctor = models.ForeignKey(CustomUser, limit_choices_to={'role': 'DOCTOR'}, related_name='doctor_prescriptions', on_delete=models.CASCADE)
+    patient = models.ForeignKey(CustomUser, limit_choices_to={'role': 'PATIENT'}, related_name='patient_prescriptions', on_delete=models.CASCADE)
 
-     def __str__ (self):
-          return f"{self.drugType}-{self.drugName}"
+    def __str__(self):
+        return f"{self.drug_type} - {self.drug_name}"
