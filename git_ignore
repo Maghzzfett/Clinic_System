@@ -1,1 +1,22 @@
+# Django-specific files
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Environment settings
 .env
+*.env
+
+# Django logs
+*.log
+
+# Local database
+db.sqlite3
+
+
+
+
+
+
+
